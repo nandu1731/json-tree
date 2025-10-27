@@ -1,6 +1,7 @@
-import Header from '@/components/header'
-import JsonTreeLayout from '@/components/jsonTreeLayout'
-import '@xyflow/react/dist/style.css'
+import Header from '@/components/header';
+import '@xyflow/react/dist/style.css';
+import JsonTreeLayout from '@/components/jsonTreeLayout';
+
 
 export default function Home() {
   return (
@@ -10,5 +11,5 @@ export default function Home() {
         <JsonTreeLayout />
       </div>
     </div>
-  )
+  );
 }
