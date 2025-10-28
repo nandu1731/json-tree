@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { ReactFlow } from '@xyflow/react';
+import { ReactFlow, useReactFlow, fitView, Controls } from '@xyflow/react';
+import DownloadButton from './downloadButton';
 
 const JsonTreeLayout = () => {
+  const reactFlowInstance = useReactFlow();
   const [jsonInput, setJsonInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
   const [flowData, setFlowData] = useState({ nodes: [], edges: [] });
+  const [searchMessage, setSearchMessage] = useState('');
 
   const validateJson = () => {
     if (!jsonInput.trim()) {
@@ -29,6 +32,66 @@ const JsonTreeLayout = () => {
     setFlowData({ nodes, edges });
   };
 
+  const getTargetNode = () => {
+    const cleanPath = searchQuery.replace(/^\$\./, '').replace(/\[(\d+)\]/g, '.$1');
+    const targetId = cleanPath.split('.').join('.');
+    return flowData.nodes.find(n => n.id.endsWith(targetId));
+  };
+
+  const handleSearch = () => {
+    if (!flowData.nodes.length) {
+      setSearchMessage('Please enter JSON to generate tree');
+      return;
+    }
+    if (!searchQuery.trim()) {
+      setSearchMessage('Please enter a valid JSON path.');
+      return;
+    }
+
+    const matchedNode = getTargetNode();
+
+    if (matchedNode) {
+      const formattedNodes = flowData.nodes.map(n =>
+        n.id === matchedNode.id
+          ? {
+              ...n,
+              style: {
+                ...n.style,
+                border: '3px solid #FFD700',
+                boxShadow: '0 0 10px #FFD700',
+              },
+            }
+          : n
+      );
+      setFlowData(prev => ({
+        ...prev,
+        nodes: formattedNodes,
+      }));
+      reactFlowInstance.setCenter(matchedNode.position.x, matchedNode.position.y, {
+        zoom: 1.4,
+        duration: 800,
+      });
+      setSearchMessage('Match found!');
+    } else {
+      handleReset();
+      setSearchMessage('No match found.');
+    }
+  };
+
+  const handleReset = () => {
+    if (!searchQuery.trim() || !flowData.nodes) {
+      return;
+    }
+    setFlowData(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(n => ({
+        ...n,
+        style: { ...n.style, border: 'none', boxShadow: 'none' },
+      })),
+    }));
+    reactFlowInstance.fitView({ padding: 0.2, duration: 800 });
+  };
+
   return (
     <div className="grid grid-cols-2 gap-6">
       <div>
@@ -46,7 +109,7 @@ const JsonTreeLayout = () => {
         }
     }
 }`}
-          className="h-64 w-full rounded border-2 border-gray-300 bg-white p-4 font-mono text-sm text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          className="h-72 w-full rounded border-2 border-gray-300 bg-white p-4 font-mono text-sm text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
         />
         {error && <p className="text-red-500">{error}</p>}
         <button
@@ -66,12 +129,25 @@ const JsonTreeLayout = () => {
             placeholder="$ user.address.city"
             className="flex-1 rounded border-2 border-gray-300 bg-white px-4 py-2 text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
-          <button className="rounded bg-blue-500 px-6 py-2 font-medium text-white shadow transition-colors hover:bg-blue-600">
+          <button
+            className="rounded bg-blue-500 px-6 py-2 font-medium text-white shadow transition-colors hover:bg-blue-600"
+            onClick={handleSearch}
+          >
             Search
           </button>
+          <button
+            className="rounded bg-gray-400 px-6 py-2 font-medium text-white shadow transition-colors hover:bg-gray-600"
+            onClick={handleReset}
+          >
+            Reset
+          </button>
         </div>
+        {searchMessage && <p className={searchMessage === 'Match found!' ? 'text-green-500' : 'text-red-500'}>{searchMessage}</p>}
         <div className="flex h-96 w-full rounded border-2 border-gray-300 bg-gray-50">
-          <ReactFlow nodes={flowData.nodes} edges={flowData.edges} fitView nodesConnectable={false} />
+          <ReactFlow nodes={flowData.nodes} edges={flowData.edges} fitView nodesConnectable={false} className="download-image">
+            <Controls />
+            <DownloadButton isDisabled={!flowData.nodes.length}/>
+          </ReactFlow>
         </div>
       </div>
     </div>
