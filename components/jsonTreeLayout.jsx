@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { ReactFlow, useReactFlow, fitView, Controls } from '@xyflow/react';
-import DownloadButton from './downloadButton';
+import { useReactFlow } from '@xyflow/react';
+import JsonInputPanel from './jsonInputPanel';
+import SearchBox from './searchBox';
+import JsonTreeViewer from './jsonTreeViewer';
 
 const JsonTreeLayout = () => {
   const reactFlowInstance = useReactFlow();
@@ -94,61 +96,16 @@ const JsonTreeLayout = () => {
 
   return (
     <div className="grid grid-cols-2 gap-6">
+      <JsonInputPanel jsonInput={jsonInput} setJsonInput={setJsonInput} onGenerate={handleGenerateTree} error={error} />
       <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700">Paste or type JSON data</label>
-        <textarea
-          value={jsonInput}
-          onChange={e => setJsonInput(e.target.value)}
-          placeholder={`{
-    "user": {
-        "name": "Nandini",
-        "age": 23,
-        "address": {
-            "city": "Vijayawada",
-            "zip": "000000"
-        }
-    }
-}`}
-          className="h-72 w-full rounded border-2 border-gray-300 bg-white p-4 font-mono text-sm text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        <SearchBox
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onReset={handleReset}
+          onSearch={handleSearch}
+          searchMessage={searchMessage}
         />
-        {error && <p className="text-red-500">{error}</p>}
-        <button
-          onClick={handleGenerateTree}
-          className="mt-4 rounded bg-blue-500 px-6 py-2 font-medium text-white shadow transition-colors hover:bg-blue-600"
-        >
-          Generate Tree
-        </button>
-      </div>
-
-      <div>
-        <div className="mb-2 flex gap-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="$ user.address.city"
-            className="flex-1 rounded border-2 border-gray-300 bg-white px-4 py-2 text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          />
-          <button
-            className="rounded bg-blue-500 px-6 py-2 font-medium text-white shadow transition-colors hover:bg-blue-600"
-            onClick={handleSearch}
-          >
-            Search
-          </button>
-          <button
-            className="rounded bg-gray-400 px-6 py-2 font-medium text-white shadow transition-colors hover:bg-gray-600"
-            onClick={handleReset}
-          >
-            Reset
-          </button>
-        </div>
-        {searchMessage && <p className={searchMessage === 'Match found!' ? 'text-green-500' : 'text-red-500'}>{searchMessage}</p>}
-        <div className="flex h-96 w-full rounded border-2 border-gray-300 bg-gray-50">
-          <ReactFlow nodes={flowData.nodes} edges={flowData.edges} fitView nodesConnectable={false} className="download-image">
-            <Controls />
-            <DownloadButton isDisabled={!flowData.nodes.length}/>
-          </ReactFlow>
-        </div>
+        <JsonTreeViewer nodes={flowData.nodes} edges={flowData.edges} />
       </div>
     </div>
   );
