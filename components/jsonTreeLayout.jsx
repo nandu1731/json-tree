@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ReactFlow, Background, Controls, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlow } from '@xyflow/react';
 
 const JsonTreeLayout = () => {
   const [jsonInput, setJsonInput] = useState('');
@@ -8,7 +8,7 @@ const JsonTreeLayout = () => {
   const [flowData, setFlowData] = useState({ nodes: [], edges: [] });
 
   const validateJson = () => {
-    if (!jsonInput || jsonInput.trim() === '') {
+    if (!jsonInput.trim()) {
       setError('JSON input cannot be empty');
       return false;
     }
@@ -16,7 +16,7 @@ const JsonTreeLayout = () => {
       JSON.parse(jsonInput);
       setError('');
       return true;
-    } catch (err) {
+    } catch {
       setError('JSON input is invalid');
       return false;
     }
@@ -25,13 +25,9 @@ const JsonTreeLayout = () => {
   const handleGenerateTree = () => {
     const isValid = validateJson();
     if (!isValid) return;
-
-    const { nodes, edges } = buildFlowFromJson(JSON.parse(jsonInput));
+    const { nodes, edges } = buildTree(JSON.parse(jsonInput));
     setFlowData({ nodes, edges });
   };
-
-  const handleSearch = () => {};
-  console.log(flowData);
 
   return (
     <div className="grid grid-cols-2 gap-6">
@@ -53,7 +49,6 @@ const JsonTreeLayout = () => {
           className="h-64 w-full rounded border-2 border-gray-300 bg-white p-4 font-mono text-sm text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
         />
         {error && <p className="text-red-500">{error}</p>}
-
         <button
           onClick={handleGenerateTree}
           className="mt-4 rounded bg-blue-500 px-6 py-2 font-medium text-white shadow transition-colors hover:bg-blue-600"
@@ -71,22 +66,12 @@ const JsonTreeLayout = () => {
             placeholder="$ user.address.city"
             className="flex-1 rounded border-2 border-gray-300 bg-white px-4 py-2 text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
-          <button
-            onClick={handleSearch}
-            className="rounded bg-blue-500 px-6 py-2 font-medium text-white shadow transition-colors hover:bg-blue-600"
-          >
+          <button className="rounded bg-blue-500 px-6 py-2 font-medium text-white shadow transition-colors hover:bg-blue-600">
             Search
           </button>
         </div>
         <div className="flex h-96 w-full rounded border-2 border-gray-300 bg-gray-50">
-          <div className="h-full w-full">
-            <ReactFlowProvider>
-              <ReactFlow nodes={flowData.nodes} edges={flowData.edges} fitView>
-                <Background />
-                <Controls />
-              </ReactFlow>
-            </ReactFlowProvider>
-          </div>
+          <ReactFlow nodes={flowData.nodes} edges={flowData.edges} fitView nodesConnectable={false} />
         </div>
       </div>
     </div>
@@ -94,45 +79,130 @@ const JsonTreeLayout = () => {
 };
 
 export default JsonTreeLayout;
-function buildFlowFromJson(json, parentId = null, level = 0, posX = 0, posY = 0, counter = { id: 1 }) {
+
+function buildTree(data, unitPx = 120, nodeGapUnits = 1, levelGapPx = 120) {
   const nodes = [];
   const edges = [];
 
-  const baseX = posX;
-  const baseY = posY + level * 150;
+  const leafCount = node => (node && typeof node === 'object' ? Object.values(node).reduce((a, v) => a + leafCount(v), 0) : 1);
 
-  const entries = Array.isArray(json) ? json.map((v, i) => [i, v]) : Object.entries(json);
+  const getNodeBgColor = val =>
+    val === 'Root' ? '#6A5ACD' : Array.isArray(val) ? '#2ECC71' : typeof val === 'object' && val !== null ? '#1E90FF' : '#FFA500';
 
-  entries.forEach(([key, value], index) => {
-    const nodeId = String(counter.id++);
-    const x = baseX + index * 200;
-    const y = baseY;
+  function traverse(node, nodeId, depth = 0, centerXunits = 0) {
+    if (node === null || typeof node !== 'object') return { widthUnits: 1 };
+    const entries = Array.isArray(node) ? node.map((v, i) => [String(i), v]) : Object.entries(node);
 
-    const isObject = typeof value === 'object' && value !== null;
-    const isArray = Array.isArray(value);
-
-    let label = '';
-    if (isArray || isObject) label = key;
-    else label = `${key}: ${value}`;
-
-    nodes.push({
-      id: nodeId,
-      position: { x, y },
-      data: { label },
-      type: 'default',
+    const childrenMeta = entries.map(([key, val]) => {
+      const lc = leafCount(val);
+      const pad = Math.floor(lc / 2);
+      const childUnits = lc + pad * 2;
+      return { key, val, leafs: lc, pad, childUnits };
     });
 
-    if (parentId) {
-      edges.push({ id: `${parentId}-${nodeId}`, source: parentId, target: nodeId });
-    }
+    const totalUnits = childrenMeta.reduce((s, c) => s + c.childUnits, 0) + Math.max(0, childrenMeta.length - 1) * nodeGapUnits;
+    let startXunits = centerXunits - totalUnits / 2;
 
-    if (isObject || isArray) {
-      const childXStart = x - (entries.length / 2) * 150;
-      const { nodes: childNodes, edges: childEdges } = buildFlowFromJson(value, nodeId, level + 1, childXStart, y + 150, counter);
-      nodes.push(...childNodes);
-      edges.push(...childEdges);
-    }
-  });
+    childrenMeta.forEach(meta => {
+      const childId = nodeId ? `${nodeId}.${meta.key}` : `${meta.key}`;
+      const childCenterUnits = startXunits + meta.childUnits / 2;
+      const childLabel = Array.isArray(meta.val) || typeof meta.val === 'object' ? `${meta.key}` : `${meta.key}: ${String(meta.val)}`;
+
+      nodes.push({
+        id: childId,
+        data: { label: childLabel },
+        position: { x: childCenterUnits * (unitPx - 40), y: depth * levelGapPx },
+        style: {
+          backgroundColor: getNodeBgColor(meta.val),
+          color: '#fff',
+        },
+      });
+
+      if (nodeId)
+        edges.push({
+          id: `${nodeId}-${childId}`,
+          source: nodeId,
+          target: childId,
+          type: 'step',
+        });
+
+      if (meta.leafs > 0 && typeof meta.val === 'object' && meta.val !== null) traverse(meta.val, childId, depth + 1, childCenterUnits);
+
+      startXunits += meta.childUnits + nodeGapUnits;
+    });
+
+    return { widthUnits: totalUnits };
+  }
+
+  const rootKeys = Object.keys(data);
+
+  if (rootKeys.length > 1) {
+    // multiple keys-add root node
+    const topMeta = rootKeys.map(k => {
+      const v = data[k];
+      const lc = leafCount(v);
+      const pad = Math.floor(lc / 2);
+      const w = lc + pad * 2;
+      return { key: k, val: v, leafs: lc, pad, widthUnits: w };
+    });
+
+    const totalTopUnits = topMeta.reduce((s, t) => s + t.widthUnits, 0) + Math.max(0, topMeta.length - 1) * nodeGapUnits;
+
+    const rootId = 'Root';
+    nodes.push({
+      id: rootId,
+      data: { label: 'Root' },
+      position: { x: 0, y: 0 },
+      style: {
+        backgroundColor: getNodeBgColor('Root'),
+        color: '#fff',
+      },
+    });
+
+    let curXunits = -totalTopUnits / 2;
+
+    topMeta.forEach(t => {
+      const topId = t.key;
+      const topCenterUnits = curXunits + t.widthUnits / 2;
+      nodes.push({
+        id: topId,
+        data: { label: topId },
+        position: { x: topCenterUnits * unitPx, y: levelGapPx },
+        style: {
+          backgroundColor: getNodeBgColor(t.val),
+          color: '#fff',
+        },
+      });
+      edges.push({
+        id: `${rootId}-${topId}`,
+        source: rootId,
+        target: topId,
+        type: 'step',
+      });
+      traverse(t.val, topId, 2, topCenterUnits);
+      curXunits += t.widthUnits + nodeGapUnits;
+    });
+  } else if (rootKeys.length === 1) {
+    // single key- no root node
+    const key = rootKeys[0];
+    const val = data[key];
+    const lc = leafCount(val);
+    const pad = Math.floor(lc / 2);
+    const w = lc + pad * 2;
+    const topCenterUnits = 0;
+
+    nodes.push({
+      id: key,
+      data: { label: key },
+      position: { x: 0, y: 0 },
+      style: {
+        backgroundColor: getNodeBgColor(val),
+        color: '#fff',
+      },
+    });
+
+    traverse(val, key, 1, topCenterUnits);
+  }
 
   return { nodes, edges };
 }
