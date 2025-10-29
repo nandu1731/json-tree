@@ -3,6 +3,7 @@ import { ReactFlow, Controls, Background, useReactFlow } from '@xyflow/react';
 import DownloadButton from './downloadButton';
 
 const JsonTreeViewer = ({ nodes, edges }) => {
+  const hasFitOnce = useRef(false);
   const wrapperRef = useRef(null);
   const { fitView } = useReactFlow();
   const [hoveredNode, setHoveredNode] = useState(null);
@@ -35,10 +36,13 @@ const JsonTreeViewer = ({ nodes, edges }) => {
   }, []);
 
   useEffect(() => {
-    if (nodes.length > 0) {
-      setTimeout(() => fitView({ padding: 0.2 }), 300);
+    if (!hasFitOnce.current && nodes.length > 0) {
+      setTimeout(() => {
+        fitView({ padding: 0.2 });
+        hasFitOnce.current = true;
+      }, 300);
     }
-  }, [nodes, edges, fitView]);  
+  }, [nodes, fitView]);
 
   return (
     <div

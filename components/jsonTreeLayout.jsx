@@ -91,6 +91,8 @@ const JsonTreeLayout = () => {
         style: { ...n.style, border: 'none', boxShadow: 'none' },
       })),
     }));
+    setSearchQuery('');
+    setSearchMessage('');
     reactFlowInstance.fitView({ padding: 0.2, duration: 800 });
   };
 
