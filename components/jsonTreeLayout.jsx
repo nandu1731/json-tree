@@ -94,26 +94,40 @@ const JsonTreeLayout = () => {
     reactFlowInstance.fitView({ padding: 0.2, duration: 800 });
   };
 
+  const handleResetAll = () => {
+    setJsonInput('');
+    setFlowData({ nodes: [], edges: [] });
+    setError('');
+    setSearchQuery('');
+    setSearchMessage('');
+  };
+
   return (
-    <div className="grid grid-cols-2 gap-6">
-      <JsonInputPanel jsonInput={jsonInput} setJsonInput={setJsonInput} onGenerate={handleGenerateTree} error={error} />
-      <div>
-        <SearchBox
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onReset={handleReset}
-          onSearch={handleSearch}
-          searchMessage={searchMessage}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <JsonInputPanel
+          jsonInput={jsonInput}
+          setJsonInput={setJsonInput}
+          onGenerate={handleGenerateTree}
+          handleReset={handleResetAll}
+          error={error}
         />
-        <JsonTreeViewer nodes={flowData.nodes} edges={flowData.edges} />
+        <div className="md:col-span-2">
+          <SearchBox
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onReset={handleReset}
+            onSearch={handleSearch}
+            searchMessage={searchMessage}
+          />
+          <JsonTreeViewer nodes={flowData.nodes} edges={flowData.edges} />
+        </div>
       </div>
-    </div>
   );
 };
 
 export default JsonTreeLayout;
 
-function buildTree(data, unitPx = 120, nodeGapUnits = 1, levelGapPx = 120) {
+function buildTree(data, unitPx = 150, nodeGapUnits = 0.8, levelGapPx = 120) {
   const nodes = [];
   const edges = [];
 
@@ -124,30 +138,40 @@ function buildTree(data, unitPx = 120, nodeGapUnits = 1, levelGapPx = 120) {
 
   function traverse(node, nodeId, depth = 0, centerXunits = 0) {
     if (node === null || typeof node !== 'object') return { widthUnits: 1 };
+
     const entries = Array.isArray(node) ? node.map((v, i) => [String(i), v]) : Object.entries(node);
 
     const childrenMeta = entries.map(([key, val]) => {
       const lc = leafCount(val);
-      const pad = Math.floor(lc / 2);
-      const childUnits = lc + pad * 2;
-      return { key, val, leafs: lc, pad, childUnits };
+      const childUnits = typeof val === 'object' && val !== null ? Math.max(lc * 1.1, 1) : 0.8;
+      return { key, val, leafs: lc, childUnits };
     });
 
     const totalUnits = childrenMeta.reduce((s, c) => s + c.childUnits, 0) + Math.max(0, childrenMeta.length - 1) * nodeGapUnits;
+
     let startXunits = centerXunits - totalUnits / 2;
 
     childrenMeta.forEach(meta => {
       const childId = nodeId ? `${nodeId}.${meta.key}` : `${meta.key}`;
       const childCenterUnits = startXunits + meta.childUnits / 2;
-      const childLabel = Array.isArray(meta.val) || typeof meta.val === 'object' ? `${meta.key}` : `${meta.key}: ${String(meta.val)}`;
+      const isObject = typeof meta.val === 'object' && meta.val !== null;
+      const childLabel = isObject || Array.isArray(meta.val) ? `${meta.key}` : `${meta.key}: ${String(meta.val)}`;
 
       nodes.push({
         id: childId,
-        data: { label: childLabel },
-        position: { x: childCenterUnits * (unitPx - 40), y: depth * levelGapPx },
+        type: 'default',
+        data: {
+          label: childLabel,
+          path: childId,
+          value: isObject ? JSON.stringify(meta.val) : String(meta.val),
+        },
+        position: { x: childCenterUnits * unitPx, y: depth * levelGapPx },
         style: {
           backgroundColor: getNodeBgColor(meta.val),
           color: '#fff',
+          padding: '6px 10px',
+          fontSize: '13px',
+          minWidth: '60px',
         },
       });
 
@@ -159,7 +183,9 @@ function buildTree(data, unitPx = 120, nodeGapUnits = 1, levelGapPx = 120) {
           type: 'step',
         });
 
-      if (meta.leafs > 0 && typeof meta.val === 'object' && meta.val !== null) traverse(meta.val, childId, depth + 1, childCenterUnits);
+      if (meta.leafs > 0 && isObject) {
+        traverse(meta.val, childId, depth + 1, childCenterUnits);
+      }
 
       startXunits += meta.childUnits + nodeGapUnits;
     });
@@ -170,13 +196,12 @@ function buildTree(data, unitPx = 120, nodeGapUnits = 1, levelGapPx = 120) {
   const rootKeys = Object.keys(data);
 
   if (rootKeys.length > 1) {
-    // multiple keys-add root node
+    // multiple keys - add root node
     const topMeta = rootKeys.map(k => {
       const v = data[k];
       const lc = leafCount(v);
-      const pad = Math.floor(lc / 2);
-      const w = lc + pad * 2;
-      return { key: k, val: v, leafs: lc, pad, widthUnits: w };
+      const w = typeof v === 'object' && v !== null ? Math.max(lc * 1.1, 1) : 0.8;
+      return { key: k, val: v, leafs: lc, widthUnits: w };
     });
 
     const totalTopUnits = topMeta.reduce((s, t) => s + t.widthUnits, 0) + Math.max(0, topMeta.length - 1) * nodeGapUnits;
@@ -184,11 +209,15 @@ function buildTree(data, unitPx = 120, nodeGapUnits = 1, levelGapPx = 120) {
     const rootId = 'Root';
     nodes.push({
       id: rootId,
-      data: { label: 'Root' },
+      type: 'default',
+      data: { label: 'Root', path: 'Root', value: '' },
       position: { x: 0, y: 0 },
       style: {
         backgroundColor: getNodeBgColor('Root'),
         color: '#fff',
+        padding: '6px 10px',
+        fontSize: '13px',
+        minWidth: '60px',
       },
     });
 
@@ -199,11 +228,19 @@ function buildTree(data, unitPx = 120, nodeGapUnits = 1, levelGapPx = 120) {
       const topCenterUnits = curXunits + t.widthUnits / 2;
       nodes.push({
         id: topId,
-        data: { label: topId },
+        type: 'default',
+        data: {
+          label: topId,
+          path: topId,
+          value: typeof t.val === 'object' && t.val !== null ? JSON.stringify(t.val) : String(t.val),
+        },
         position: { x: topCenterUnits * unitPx, y: levelGapPx },
         style: {
           backgroundColor: getNodeBgColor(t.val),
           color: '#fff',
+          padding: '6px 10px',
+          fontSize: '13px',
+          minWidth: '60px',
         },
       });
       edges.push({
@@ -216,25 +253,29 @@ function buildTree(data, unitPx = 120, nodeGapUnits = 1, levelGapPx = 120) {
       curXunits += t.widthUnits + nodeGapUnits;
     });
   } else if (rootKeys.length === 1) {
-    // single key- no root node
+    // single key - no root node
     const key = rootKeys[0];
     const val = data[key];
-    const lc = leafCount(val);
-    const pad = Math.floor(lc / 2);
-    const w = lc + pad * 2;
-    const topCenterUnits = 0;
 
     nodes.push({
       id: key,
-      data: { label: key },
+      type: 'default',
+      data: {
+        label: key,
+        path: key,
+        value: typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val),
+      },
       position: { x: 0, y: 0 },
       style: {
         backgroundColor: getNodeBgColor(val),
         color: '#fff',
+        padding: '6px 10px',
+        fontSize: '13px',
+        minWidth: '60px',
       },
     });
 
-    traverse(val, key, 1, topCenterUnits);
+    traverse(val, key, 1, 0);
   }
 
   return { nodes, edges };

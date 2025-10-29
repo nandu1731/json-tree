@@ -9,15 +9,29 @@ function downloadImage(dataUrl) {
   a.click();
 }
 
-const imageWidth = 1600;
-const imageHeight = 1600;
-
 function DownloadButton({ isDisabled }) {
   const { getNodes } = useReactFlow();
-  const onClick = async() => {
-    const nodesBounds = getNodesBounds(getNodes());
-    const viewport = getViewportForBounds(nodesBounds, imageWidth, imageHeight, 0.2, 1.4);
-    await new Promise((resolve) => setTimeout(resolve, 200));
+
+  const onClick = async () => {
+    const nodes = getNodes();
+    if (!nodes.length) return;
+
+    const nodesBounds = getNodesBounds(nodes);
+
+    const padding = 20;
+    const imageWidth = nodesBounds.width + padding * 8;
+    const imageHeight = nodesBounds.height + padding * 8;
+
+    // Viewport calculation (no zoom-out)
+    const viewport = getViewportForBounds(
+      nodesBounds,
+      imageWidth,
+      imageHeight,
+      0.01, // keep tiny padding around
+      1 // do not zoom out
+    );
+
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     toPng(document.querySelector('.react-flow__viewport'), {
       backgroundColor: '#1a365d',
