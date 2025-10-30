@@ -182,7 +182,7 @@ function buildTree(data, unitPx = 150, nodeGapUnits = 0.8, levelGapPx = 120) {
           id: `${nodeId}-${childId}`,
           source: nodeId,
           target: childId,
-          type: 'step',
+          type: 'smoothstep',
         });
 
       if (meta.leafs > 0 && isObject) {

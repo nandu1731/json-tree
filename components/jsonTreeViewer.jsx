@@ -2,6 +2,13 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ReactFlow, Controls, Background, useReactFlow } from '@xyflow/react';
 import DownloadButton from './downloadButton';
 
+const legendItems = [
+  { label: 'Root', color: '#6A5ACD' },
+  { label: 'Array', color: '#2ECC71' },
+  { label: 'Object', color: '#1E90FF' },
+  { label: 'Primitive', color: '#FFA500' },
+];
+
 const JsonTreeViewer = ({ nodes, edges }) => {
   const hasFitOnce = useRef(false);
   const wrapperRef = useRef(null);
@@ -65,6 +72,20 @@ const JsonTreeViewer = ({ nodes, edges }) => {
         <Controls />
         <DownloadButton isDisabled={!nodes.length} />
       </ReactFlow>
+
+       <div className="absolute bottom-4 right-4 z-10 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-md">
+        <div className="flex items-center gap-4">
+          {legendItems.map((item, idx) => (
+            <div key={idx} className="flex items-center gap-1.5">
+              <div
+                className="h-3 w-3 rounded-sm"
+                style={{ backgroundColor: item.color }}
+              />
+              <span className="text-xs text-gray-600">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {hoveredNode && hoveredNode.data && (
         <div
